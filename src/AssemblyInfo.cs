@@ -5,6 +5,6 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyProduct("图片转 ICO")]
 [assembly: AssemblyDescription("图片转 ICO 图标工具（便携版）")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyVersion("1.0.3.0")]
-[assembly: AssemblyFileVersion("1.0.3.0")]
+[assembly: AssemblyVersion("1.0.4.0")]
+[assembly: AssemblyFileVersion("1.0.4.0")]
 [assembly: ComVisible(false)]

@@ -214,7 +214,6 @@ namespace ImageToIco
             Controls.Add(radiusBox);
 
             radiusBar = new TrackBar();
-            radiusBar.Bounds = new Rectangle(186, 470, 240, 32);
             radiusBar.Minimum = 0;
             radiusBar.Maximum = 50;
             radiusBar.TickFrequency = 5;
@@ -222,6 +221,11 @@ namespace ImageToIco
             radiusBar.SmallChange = 1;
             radiusBar.LargeChange = 5;
             radiusBar.Scroll += delegate { radiusBox.Value = radiusBar.Value; };
+            // TrackBar 默认 AutoSize = true，高度会被撑到首选值（45px）；若 Bounds 里写 32px，
+            // 窗体显示时又会按 32px 压回去，把底部刻度挤掉。先关 AutoSize 再按首选高度定位。
+            radiusBar.AutoSize = false;
+            int barHeight = radiusBar.PreferredSize.Height;
+            radiusBar.Bounds = new Rectangle(186, 470, 240, barHeight);
             Controls.Add(radiusBar);
 
             Label pct = new Label();
@@ -231,7 +235,12 @@ namespace ImageToIco
             pct.Location = new Point(432, 478);
             Controls.Add(pct);
 
-            Label lblOut = MakeLabel("输出位置", 32, 518);
+            // 「输出位置」整行按圆角这一行的实际底边定位，留 12px 间距，
+            // 不再用固定坐标，避免控件实际尺寸变化后再次重叠
+            int radiusBottom = Math.Max(radiusBox.Bottom, radiusBar.Bottom);
+            int outTop = Math.Max(512, radiusBottom + 12);
+
+            Label lblOut = MakeLabel("输出位置", 32, outTop + 6);
             Controls.Add(lblOut);
 
             rdoSource = new RadioButton();
@@ -239,7 +248,7 @@ namespace ImageToIco
             rdoSource.Checked = true;
             rdoSource.AutoSize = true;
             rdoSource.ForeColor = Ink;
-            rdoSource.Location = new Point(112, 514);
+            rdoSource.Location = new Point(112, outTop + 2);
             rdoSource.CheckedChanged += delegate { SyncOutputMode(); };
             Controls.Add(rdoSource);
 
@@ -247,12 +256,12 @@ namespace ImageToIco
             rdoCustom.Text = "指定文件夹";
             rdoCustom.AutoSize = true;
             rdoCustom.ForeColor = Ink;
-            rdoCustom.Location = new Point(248, 514);
+            rdoCustom.Location = new Point(248, outTop + 2);
             rdoCustom.CheckedChanged += delegate { SyncOutputMode(); };
             Controls.Add(rdoCustom);
 
             outBox = new TextBox();
-            outBox.Bounds = new Rectangle(352, 512, 380, 26);
+            outBox.Bounds = new Rectangle(352, outTop, 380, 26);
             outBox.ReadOnly = true;
             outBox.BackColor = Color.White;
             outBox.BorderStyle = BorderStyle.FixedSingle;
@@ -260,7 +269,7 @@ namespace ImageToIco
 
             browseBtn = new Button();
             browseBtn.Text = "浏览...";
-            browseBtn.Bounds = new Rectangle(742, 510, 146, 30);
+            browseBtn.Bounds = new Rectangle(742, outTop - 2, 146, 30);
             browseBtn.FlatStyle = FlatStyle.Flat;
             browseBtn.FlatAppearance.BorderColor = Line;
             browseBtn.BackColor = Color.White;
