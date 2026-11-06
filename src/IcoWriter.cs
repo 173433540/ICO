@@ -35,7 +35,14 @@ namespace ImageToIco
                         g.SetClip(clip);
                     }
                 }
-                g.DrawImage(src, rect);
+
+                // WrapMode.TileFlipXY 让重采样在图内取邻点，否则缩放后最外圈会变成半透明，看起来像被裁掉一圈
+                using (ImageAttributes wrap = new ImageAttributes())
+                {
+                    wrap.SetWrapMode(WrapMode.TileFlipXY);
+                    Rectangle dest = Rectangle.Round(rect);
+                    g.DrawImage(src, dest, 0, 0, src.Width, src.Height, GraphicsUnit.Pixel, wrap);
+                }
             }
             return dst;
         }

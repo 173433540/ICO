@@ -204,7 +204,7 @@ namespace ImageToIco
             radiusBox.Bounds = new Rectangle(112, 472, 64, 26);
             radiusBox.Minimum = 0;
             radiusBox.Maximum = 50;
-            radiusBox.Value = 15;
+            radiusBox.Value = 0;
             radiusBox.TextAlign = HorizontalAlignment.Center;
             radiusBox.Font = UiFont(9f, FontStyle.Regular);
             radiusBox.ValueChanged += delegate
@@ -218,7 +218,7 @@ namespace ImageToIco
             radiusBar.Minimum = 0;
             radiusBar.Maximum = 50;
             radiusBar.TickFrequency = 5;
-            radiusBar.Value = 15;
+            radiusBar.Value = 0;
             radiusBar.SmallChange = 1;
             radiusBar.LargeChange = 5;
             radiusBar.Scroll += delegate { radiusBox.Value = radiusBar.Value; };
