@@ -11,6 +11,12 @@ namespace ImageToIco
         [STAThread]
         static int Main(string[] args)
         {
+            if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v"))
+            {
+                Console.WriteLine("图片转 ICO  v" + System.Diagnostics.FileVersionInfo.GetVersionInfo(Application.ExecutablePath).FileVersion);
+                return 0;
+            }
+
             if (args.Length > 0 && (args[0] == "--convert" || args[0] == "-c"))
             {
                 return RunCli(args);

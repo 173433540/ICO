@@ -36,7 +36,7 @@ namespace ImageToIco
 
         public MainForm()
         {
-            Text = "图片转 ICO";
+            Text = "图片转 ICO  v" + ShortVersion();
             ClientSize = new Size(920, 636);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -65,6 +65,12 @@ namespace ImageToIco
         {
             try { return new Font("Microsoft YaHei UI", size, style); }
             catch { return new Font("Microsoft YaHei", size, style); }
+        }
+
+        static string ShortVersion()
+        {
+            Version v = typeof(MainForm).Assembly.GetName().Version;
+            return v.Major + "." + v.Minor + "." + v.Build;
         }
 
         void BuildHeader()
