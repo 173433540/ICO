@@ -45,6 +45,7 @@ namespace ImageToIco
             using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
             using (Image img = Image.FromStream(fs, true, true))
             {
+                int orientation = ReadOrientation(img);
                 Bitmap bmp = new Bitmap(img.Width, img.Height, PixelFormat.Format32bppArgb);
                 using (Graphics g = Graphics.FromImage(bmp))
                 {
@@ -52,7 +53,7 @@ namespace ImageToIco
                     g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
                     g.DrawImage(img, new Rectangle(0, 0, img.Width, img.Height));
                 }
-                return bmp;
+                return ApplyOrientation(bmp, orientation);
             }
         }
 
@@ -69,6 +70,7 @@ namespace ImageToIco
                 if (decoder.Frames.Count == 0) throw new InvalidOperationException("图片没有可用帧");
 
                 System.Windows.Media.Imaging.BitmapSource frame = decoder.Frames[0];
+                int orientation = ReadWpfOrientation(frame);
                 System.Windows.Media.Imaging.PngBitmapEncoder encoder =
                     new System.Windows.Media.Imaging.PngBitmapEncoder();
                 encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(frame));
@@ -85,9 +87,68 @@ namespace ImageToIco
                             g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
                             g.DrawImage(img, new Rectangle(0, 0, img.Width, img.Height));
                         }
-                        return bmp;
+                        return ApplyOrientation(bmp, orientation);
                     }
                 }
+            }
+        }
+
+        const int OrientationId = 0x0112;
+
+        static int ReadOrientation(Image img)
+        {
+            try
+            {
+                if (Array.IndexOf(img.PropertyIdList, OrientationId) < 0) return 1;
+                System.Drawing.Imaging.PropertyItem item = img.GetPropertyItem(OrientationId);
+                if (item == null || item.Value == null || item.Value.Length < 2) return 1;
+                return BitConverter.ToUInt16(item.Value, 0);
+            }
+            catch
+            {
+                return 1;
+            }
+        }
+
+        static int ReadWpfOrientation(System.Windows.Media.Imaging.BitmapSource frame)
+        {
+            try
+            {
+                System.Windows.Media.Imaging.BitmapMetadata meta =
+                    frame.Metadata as System.Windows.Media.Imaging.BitmapMetadata;
+                if (meta == null) return 1;
+                object value = meta.GetQuery("/app1/ifd/{ushort=274}");
+                if (value == null) return 1;
+                return Convert.ToInt32(value);
+            }
+            catch
+            {
+                return 1;
+            }
+        }
+
+        static Bitmap ApplyOrientation(Bitmap src, int orientation)
+        {
+            RotateFlipType transform;
+            switch (orientation)
+            {
+                case 2: transform = RotateFlipType.RotateNoneFlipX; break;
+                case 3: transform = RotateFlipType.Rotate180FlipNone; break;
+                case 4: transform = RotateFlipType.Rotate180FlipX; break;
+                case 5: transform = RotateFlipType.Rotate90FlipX; break;
+                case 6: transform = RotateFlipType.Rotate90FlipNone; break;
+                case 7: transform = RotateFlipType.Rotate270FlipX; break;
+                case 8: transform = RotateFlipType.Rotate270FlipNone; break;
+                default: return src;
+            }
+            try
+            {
+                src.RotateFlip(transform);
+                return src;
+            }
+            catch
+            {
+                return src;
             }
         }
     }

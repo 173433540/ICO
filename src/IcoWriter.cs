@@ -134,9 +134,9 @@ namespace ImageToIco
             }
 
             BitmapData bd = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            int rowBytes = w * 4;
             try
             {
-                int rowBytes = w * 4;
                 byte[] row = new byte[rowBytes];
                 for (int y = 0; y < h; y++)
                 {
@@ -149,6 +149,22 @@ namespace ImageToIco
             {
                 bmp.UnlockBits(bd);
             }
+
+            // AND 掩码：alpha < 128 的像素标记为透明，避免旧程序把圆角画成黑角
+            int maskBase = 40 + xorSize;
+            for (int y = 0; y < h; y++)
+            {
+                int xorRow = 40 + y * rowBytes;
+                int maskRow = maskBase + y * maskStride;
+                for (int x = 0; x < w; x++)
+                {
+                    if (outBytes[xorRow + x * 4 + 3] < 128)
+                    {
+                        outBytes[maskRow + (x >> 3)] |= (byte)(0x80 >> (x & 7));
+                    }
+                }
+            }
+
             return outBytes;
         }
     }

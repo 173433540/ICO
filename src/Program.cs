@@ -88,7 +88,13 @@ namespace ImageToIco
                 }
                 if (output == null)
                 {
-                    output = Path.Combine(Path.GetDirectoryName(input), Path.GetFileNameWithoutExtension(input) + ".ico");
+                    string inDir = Path.GetDirectoryName(input);
+                    string baseName = Path.GetFileNameWithoutExtension(input);
+                    output = Path.Combine(inDir, baseName + ".ico");
+                    if (string.Equals(Path.GetFullPath(output), Path.GetFullPath(input), StringComparison.OrdinalIgnoreCase))
+                    {
+                        output = Path.Combine(inDir, baseName + " (2).ico");
+                    }
                 }
 
                 using (Bitmap bmp = ImageLoader.Load(input))

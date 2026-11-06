@@ -32,6 +32,7 @@ namespace ImageToIco
         Button browseBtn;
         Button convertBtn;
         Label status;
+        bool busy;
 
         public MainForm()
         {
@@ -144,6 +145,7 @@ namespace ImageToIco
             list.MultiSelect = true;
             list.BorderStyle = BorderStyle.FixedSingle;
             list.SmallImageList = thumbs;
+            list.ShowItemToolTips = true;
             list.Font = UiFont(9f, FontStyle.Regular);
             list.Columns.Add("文件", 470);
             list.Columns.Add("大小", 110);
@@ -320,6 +322,7 @@ namespace ImageToIco
 
         void ToggleAll()
         {
+            if (busy) return;
             bool allOn = true;
             foreach (SizeChip c in chips)
             {
@@ -330,6 +333,7 @@ namespace ImageToIco
 
         void OpenFiles()
         {
+            if (busy) return;
             using (OpenFileDialog dlg = new OpenFileDialog())
             {
                 dlg.Title = "选择图片";
@@ -361,20 +365,32 @@ namespace ImageToIco
 
         public void AddFiles(string[] paths)
         {
-            if (paths == null) return;
+            if (paths == null || busy) return;
             int added = 0;
             int skipped = 0;
             int tooBig = 0;
+            int dup = 0;
+
+            HashSet<string> existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (ListViewItem row in list.Items)
+            {
+                string known = row.Tag as string;
+                if (known != null) existing.Add(known);
+            }
 
             foreach (string raw in paths)
             {
                 string path = raw;
                 if (Directory.Exists(path))
                 {
-                    foreach (string f in Directory.GetFiles(path))
+                    string[] files;
+                    try { files = Directory.GetFiles(path); }
+                    catch { skipped++; continue; }
+                    foreach (string f in files)
                     {
                         if (!ImageLoader.IsSupported(f)) continue;
                         if (TooBig(f)) { tooBig++; continue; }
+                        if (!existing.Add(f)) { dup++; continue; }
                         AddOne(f);
                         added++;
                     }
@@ -383,12 +399,14 @@ namespace ImageToIco
                 if (!File.Exists(path)) continue;
                 if (!ImageLoader.IsSupported(path)) { skipped++; continue; }
                 if (TooBig(path)) { tooBig++; continue; }
+                if (!existing.Add(path)) { dup++; continue; }
                 AddOne(path);
                 added++;
             }
 
             string msg = "已添加 " + added + " 张";
-            if (skipped > 0) msg += "，跳过 " + skipped + " 个不支持的格式";
+            if (dup > 0) msg += "，" + dup + " 张已在列表中";
+            if (skipped > 0) msg += "，跳过 " + skipped + " 个不支持的格式或无法访问的文件夹";
             if (tooBig > 0) msg += "，跳过 " + tooBig + " 个超过 100 MB 的文件";
             status.Text = msg;
         }
@@ -441,6 +459,7 @@ namespace ImageToIco
 
         void RemoveSelected()
         {
+            if (busy) return;
             foreach (ListViewItem row in list.SelectedItems)
             {
                 list.Items.Remove(row);
@@ -458,6 +477,7 @@ namespace ImageToIco
 
         void ClearList()
         {
+            if (busy) return;
             list.Items.Clear();
             thumbs.Images.Clear();
             status.Text = "列表已清空";
@@ -482,6 +502,8 @@ namespace ImageToIco
 
         void ConvertAll()
         {
+            if (busy) return;
+
             if (list.Items.Count == 0)
             {
                 MessageBox.Show(this, "请先添加要转换的图片。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -508,14 +530,21 @@ namespace ImageToIco
             int radius = (int)radiusBox.Value;
             int ok = 0;
             int fail = 0;
+            string firstError = null;
 
+            ListViewItem[] rows = new ListViewItem[list.Items.Count];
+            list.Items.CopyTo(rows, 0);
+            HashSet<string> used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            busy = true;
             Application.UseWaitCursor = true;
             convertBtn.Enabled = false;
 
             try
             {
-                foreach (ListViewItem row in list.Items)
+                foreach (ListViewItem row in rows)
                 {
+                    if (row.ListView == null) continue;
                     string src = row.Tag as string;
                     if (src == null) continue;
                     row.SubItems[2].Text = "转换中...";
@@ -524,7 +553,8 @@ namespace ImageToIco
                     try
                     {
                         string dir = rdoCustom.Checked ? customDir : Path.GetDirectoryName(src);
-                        string outPath = Path.Combine(dir, Path.GetFileNameWithoutExtension(src) + ".ico");
+                        if (string.IsNullOrEmpty(dir)) dir = Environment.CurrentDirectory;
+                        string outPath = UniqueOutputPath(dir, Path.GetFileNameWithoutExtension(src), src, used);
 
                         using (Bitmap bmp = ImageLoader.Load(src))
                         {
@@ -533,6 +563,7 @@ namespace ImageToIco
 
                         row.SubItems[2].Text = "已生成";
                         row.SubItems[2].ForeColor = AccentDark;
+                        row.ToolTipText = outPath;
                         ok++;
                     }
                     catch (Exception ex)
@@ -540,17 +571,53 @@ namespace ImageToIco
                         row.SubItems[2].Text = "失败";
                         row.SubItems[2].ForeColor = Color.FromArgb(200, 70, 70);
                         row.ToolTipText = ex.Message;
+                        if (firstError == null) firstError = Path.GetFileName(src) + "：" + ex.Message;
                         fail++;
                     }
                 }
             }
             finally
             {
+                busy = false;
                 convertBtn.Enabled = true;
                 Application.UseWaitCursor = false;
             }
 
-            status.Text = "完成：" + ok + " 个成功" + (fail > 0 ? "，" + fail + " 个失败" : "");
+            if (fail > 0)
+            {
+                status.Text = "完成：" + ok + " 个成功，" + fail + " 个失败（鼠标停在「状态」列看原因）";
+                if (ok == 0)
+                {
+                    MessageBox.Show(this, "全部转换失败。\n\n" + firstError, "转换失败",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            else
+            {
+                status.Text = "完成：" + ok + " 个成功";
+            }
+        }
+
+        static string UniqueOutputPath(string dir, string baseName, string src, HashSet<string> used)
+        {
+            string candidate = Path.Combine(dir, baseName + ".ico");
+            for (int i = 2; ; i++)
+            {
+                if (!SamePath(candidate, src) && used.Add(candidate)) return candidate;
+                candidate = Path.Combine(dir, baseName + " (" + i + ").ico");
+            }
+        }
+
+        static bool SamePath(string a, string b)
+        {
+            try
+            {
+                return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 
